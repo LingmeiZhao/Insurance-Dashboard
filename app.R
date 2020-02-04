@@ -33,7 +33,7 @@ new_df1 <- df %>% group_by(`Claim Reason`) %>% summarise(n())
 
 
 ui <- dashboardPage(
-  dashboardHeader(title = "Insurance Data Dashboard"),
+  dashboardHeader(title = "Insurance Dashboard"),
   dashboardSidebar(
     sidebarMenu(
       menuItem("Dashboard", tabName = "dashboard"),
@@ -51,37 +51,37 @@ ui <- dashboardPage(
               fluidRow(
                 box(
                   width = 4, status = "info", solidHeader = TRUE,
-                  title = "Distribution of Claim Amount",
-                  plotOutput("histPlot", width = "100%", height = 600)
+                  title = "Bar Plot of Employment Status of Customers in Different States",
+                  plotOutput("barPlot", width = "100%", height = 500)
                 ),
                 box(
                   width = 4, status = "info", solidHeader = TRUE,
-                  title = "Bar Plot of Employment Status of Customers in Different States",
-                  plotOutput("barPlot")
+                  title = "Distribution of Claim Amount",
+                  plotOutput("histPlot", width = "100%", height = 500)
                 ),
                 box(
                   width = 4, status = "info", solidHeader = TRUE,
                   title = "Ratio of Claim Reason",
-                  plotOutput("circlePlot")
+                  plotOutput("circlePlot", width = "100%", height = 500)
                 )
               ),
               fluidRow(
-                box(
-                  sliderInput(inputId = "bins",
-                              label = "Number of bins:",
-                              min = 5,
-                              max = 50,
-                              value = 30)
+                box(width = 4,
+                    selectInput("status",
+                                label = "Choose a Employment Status to Display",
+                                choices =c("Disabled",
+                                           "Employed",
+                                           "Medical Leave",
+                                           "Retired",
+                                           "Unemployed"),
+                                selected = "Employed")
                 ),
-                box(
-                  selectInput("status",
-                              label = "Choose a Employment Status to Display",
-                              choices =c("Disabled",
-                                         "Employed",
-                                         "Medical Leave",
-                                         "Retired",
-                                         "Unemployed"),
-                              selected = "Employed")
+                box(width = 4,
+                    sliderInput(inputId = "bins",
+                                label = "Number of bins:",
+                                min = 5,
+                                max = 50,
+                                value = 30)
                 )
               )
       ),
@@ -95,7 +95,7 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output) {
-
+  
   output$gender <- renderValueBox({
     female <- df %>%  group_by(Gender) %>% summarise(n())
     
@@ -128,6 +128,12 @@ server <- function(input, output) {
     hist(data, breaks = bins,  col = "#75AADB", 
          xlabs = "Claim Amount of Every Customer",
          main = "Histogram of Claim Amount")
+    abline(v = mean(df$`Claim Amount`), col = "red", lwd = 1)
+    abline(v = median(df$`Claim Amount`), col = "darkgreen", lwd = 1)
+    legend(x = "topright", # location of legend within plot area
+           c("Mean", "Median"),
+           col = c("red", "darkgreen"),
+           lwd = c(2, 2))
   })
   
   output$barPlot <- renderPlot({
@@ -153,6 +159,7 @@ server <- function(input, output) {
                      "Retired" = "Retired",
                      "Unemployed" = "Unemployed")
     
+    
     new_df %>% ggplot(aes(x = State, y = data)) + 
       geom_bar(fill = color, colour = "black", stat = "identity") +
       labs(x = "States",
@@ -170,16 +177,9 @@ server <- function(input, output) {
       coord_polar(theta = "y") +
       theme(axis.ticks = element_blank()) +
       theme(legend.title = element_blank(), legend.position = "top") +
-      scale_fill_discrete(breaks = new_df1$`Claim Reason`, labels = myLabel)
-    
+      scale_fill_discrete(breaks = new_df1$`Claim Reason`, labels = myLabel) 
   })
 }
 
-
-
-#df %>% ggplot(aes(x = `Claim Reason`, fill = `Claim Reason`)) + 
-#  geom_bar( width = 1) + coord_polar(theta = "x") +
-#  labs(y = "", title = "") +
-#  scale_fill_discrete(breaks = df$`Claim Reason`, labels = myLabel)
 
 shinyApp(ui, server)
