@@ -1,8 +1,6 @@
 library(shiny)
 library(shinydashboard)
 library(tidyverse)
-library(maps)
-library(mapproj)
 library(here)
 library(cowplot)
 
