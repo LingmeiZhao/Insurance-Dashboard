@@ -7,28 +7,6 @@ library(cowplot)
 path <- here('data', 'Auto_Insurance_Claims_Sample.csv')
 df <- read_csv(path)
 
-new_df <- df %>% group_by(State) %>% count(EmploymentStatus) 
-new_df <- new_df %>% spread(key = "EmploymentStatus", value = n)
-new_df <- new_df %>% group_by(State) %>%
-  mutate(Disabled_percent = 100 * Disabled / (Disabled + Employed + `Medical Leave` + Retired + Unemployed))
-new_df <- new_df %>% group_by(State) %>%
-  mutate(Employed_percent = 100 * Employed / (Disabled + Employed + `Medical Leave` + Retired + Unemployed))
-
-new_df <- new_df %>% group_by(State) %>%
-  mutate(Med_leave_percent = 100 * `Medical Leave` / (Disabled + Employed + `Medical Leave` + Retired + Unemployed))
-
-new_df <- new_df %>% group_by(State) %>%
-  mutate(Retired_percent = 100 * Retired / (Disabled + Employed + `Medical Leave` + Retired + Unemployed))
-
-new_df <- new_df %>% group_by(State) %>%
-  mutate(Unemployed_percent = 100 * Unemployed / (Disabled + Employed + `Medical Leave` + Retired + Unemployed))
-
-new_df$Disabled_percent <- round(new_df$Disabled_percent, 2)
-new_df$Employed_percent <- round(new_df$Employed_percent, 2)
-new_df$Med_leave_percent <- round(new_df$Med_leave_percent, 2)
-new_df$Retired_percent <- round(new_df$Retired_percent, 2)
-new_df$Unemployed_percent <- round(new_df$Unemployed_percent, 2)
-
 new_df1 <- df %>% group_by(`Claim Reason`) %>% summarise(n())
 
 
@@ -69,12 +47,13 @@ ui <- dashboardPage(
                 box(width = 4,
                     selectInput("status",
                                 label = "Choose a Employment Status to Display",
-                                choices =c("Disabled",
+                                choices =c("Display All",
+                                           "Disabled",
                                            "Employed",
                                            "Medical Leave",
                                            "Retired",
                                            "Unemployed"),
-                                selected = "Employed")
+                                selected = "Display All")
                 ),
                 box(width = 4,
                     sliderInput(inputId = "bins",
@@ -126,7 +105,6 @@ server <- function(input, output) {
     data <- df$`Claim Amount`
     bins <- seq(min(data), max(data), length.out = input$bins + 1)
     hist(data, breaks = bins,  col = "#75AADB", 
-         xlabs = "Claim Amount of Every Customer",
          main = "Histogram of Claim Amount")
     abline(v = mean(df$`Claim Amount`), col = "red", lwd = 1)
     abline(v = median(df$`Claim Amount`), col = "darkgreen", lwd = 1)
@@ -137,13 +115,7 @@ server <- function(input, output) {
   })
   
   output$barPlot <- renderPlot({
-    data <- switch (input$status,
-                    "Disabled" = new_df$Disabled,
-                    "Employed" = new_df$Employed,
-                    "Medical Leave" = new_df$`Medical Leave`,
-                    "Retired" = new_df$Retired,
-                    "Unemployed" = new_df$Unemployed
-    )
+    new_df <- df %>% group_by(State, Gender) %>% count(EmploymentStatus)
     
     color <- switch(input$status, 
                     "Disabled" = "black",
@@ -152,33 +124,50 @@ server <- function(input, output) {
                     "Retired"  = "blue",
                     "Unemployed" = "darkviolet")
     
-    legend <- switch(input$status, 
-                     "Disabled" = "Disabled",
-                     "Employed" = "Employed",
-                     "Medical Leave" = "Medical Leave",
-                     "Retired" = "Retired",
-                     "Unemployed" = "Unemployed")
+    if(input$status == "Display All"){
+       new_df %>% ggplot(aes(x = State, y = n, fill = Gender)) +
+        geom_col(width = 0.7, alpha = 0.8) +
+        facet_wrap(~EmploymentStatus, ncol = 2) + coord_flip() +
+        scale_y_continuous(
+          expand = expand_scale(mult = c(0, 0.05))) +
+        theme_minimal_hgrid()
+    }else{
+      new_df %>% filter(EmploymentStatus == input$status) %>% ggplot(aes(x = State, y = n)) + 
+        geom_col(width = 0.7, alpha = 0.8, fill = color) + coord_flip() +
+        scale_y_continuous(
+          expand = expand_scale(mult = c(0, 0.05))) + 
+        theme_minimal_hgrid() +
+        labs(x = "Employment Status",
+             y = "Counts")
+    }
     
     
-    new_df %>% ggplot(aes(x = State, y = data)) + 
-      geom_bar(fill = color, colour = "black", stat = "identity") +
-      labs(x = "States",
-           y = "Number of Customers") +
-      theme() +
-      theme_half_open() 
+    #new_df %>% ggplot(aes(x = State, y = data)) + 
+    #  geom_bar(fill = color, colour = "black", stat = "identity") +
+    #  labs(x = "States",
+   #        y = "Number of Customers") +
+   #   theme() +
+   #   theme_half_open() 
+  })
+
+  output$circlePlot <- renderPlot({
+    new_df1 <- df %>% group_by(`Claim Reason`) %>% summarise(reasons_number = n()) %>% 
+      arrange(desc(reasons_number)) %>% mutate(p = 100*(reasons_number / sum(reasons_number)),
+                                               label = str_c(round(p, 1), '%'))
+    
+    ggplot(new_df1, aes(x = "", y = reasons_number, fill = `Claim Reason`)) +
+      geom_col(width = 0.7, alpha = 0.8) +
+      coord_polar(theta = "y") +
+      geom_text(aes(x ="" , y = reasons_number, label = label),
+                color = "white", size = 6, position = position_stack(vjust = 0.5)) +
+      theme_map() +
+      labs(x = NULL,
+           y = NULL,
+           fill = "Claim Reason",
+           title = "Number of Claims by Claim Reason")
   })
   
-  output$circlePlot <- renderPlot({
-    myLabel <- as.vector(new_df1$`Claim Reason`)
-    myLabel <- paste(myLabel, "(", round(new_df1$`n()`/sum(new_df1$`n()`) * 100, 2), "%) ", sep = "")
-    
-    ggplot(new_df1, aes(x = "", y = `n()`, fill = `Claim Reason`)) +
-      geom_bar(stat = "identity", width = 1) +
-      coord_polar(theta = "y") +
-      theme(axis.ticks = element_blank()) +
-      theme(legend.title = element_blank(), legend.position = "top") +
-      scale_fill_discrete(breaks = new_df1$`Claim Reason`, labels = myLabel) 
-  })
+  
 }
 
 
