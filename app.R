@@ -57,10 +57,10 @@ ui <- dashboardPage(
                 ),
                 box(width = 4,
                     sliderInput(inputId = "bins",
-                                label = "Number of bins:",
-                                min = 5,
-                                max = 50,
-                                value = 30)
+                                label = "Monthes Since Last Claim",
+                                min = 0,
+                                max = 35,
+                                value = 14)
                 )
               )
       ),
@@ -102,9 +102,9 @@ server <- function(input, output) {
   })
   
   output$histPlot <- renderPlot({
-    data <- df$`Claim Amount`
-    bins <- seq(min(data), max(data), length.out = input$bins + 1)
-    hist(data, breaks = bins,  col = "#75AADB", 
+    data <- df %>% filter(`Months Since Last Claim` == input$bins) %>% select(`Claim Amount`)
+    # bins <- seq(min(data), max(data), length.out = input$bins + 1)
+    hist(data$`Claim Amount`, breaks = 20,  col = "#75AADB", 
          main = "Histogram of Claim Amount")
     abline(v = mean(df$`Claim Amount`), col = "red", lwd = 1)
     abline(v = median(df$`Claim Amount`), col = "darkgreen", lwd = 1)
@@ -140,14 +140,6 @@ server <- function(input, output) {
         labs(x = "Employment Status",
              y = "Counts")
     }
-    
-    
-    #new_df %>% ggplot(aes(x = State, y = data)) + 
-    #  geom_bar(fill = color, colour = "black", stat = "identity") +
-    #  labs(x = "States",
-   #        y = "Number of Customers") +
-   #   theme() +
-   #   theme_half_open() 
   })
 
   output$circlePlot <- renderPlot({
